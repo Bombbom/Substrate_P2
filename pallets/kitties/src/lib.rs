@@ -2,17 +2,8 @@
 
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
+/// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
-
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 use frame_support::pallet_prelude::*;
 use frame_system::pallet_prelude::*;
@@ -20,10 +11,9 @@ use frame_support::inherent::Vec;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::{*, OriginFor};
 	pub use super::*;
 
+	// Kitty struct is used to store the kitty's data.
 	#[derive(TypeInfo, Default, Encode, Decode)]
 	#[scale_info(skip_type_params(T))]
 	pub struct Kitty<T:Config> {
@@ -32,16 +22,25 @@ pub mod pallet {
 		price: u32,
 		gender: Gender,
 	}
-		// Enum Gender
+
+	// Enum Gender
 	#[derive(TypeInfo, Encode, Decode, Debug)]
 	pub enum Gender {
 		Male,
 		Female,
 	}
+
 	impl Default for Gender{
 		fn default()-> Self{
 			Gender::Male
 		}
+	}
+
+	/// Configure the pallet by specifying the parameters and types on which it depends.
+	#[pallet::config]
+	pub trait Config: frame_system::Config {
+		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 	}
 
 	#[pallet::pallet]
@@ -49,38 +48,16 @@ pub mod pallet {
 	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
-	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-	}
-	// #[pallet::config]
-	// pub trait Config: frame_system::Config {
-	// 	type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-	// }
-
 	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
-	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
-
-	// Thêm
-	#[pallet::storage]
-	pub type Number<T:Config> = StorageMap<_,Blake2_128Concat,
-											T::AccountId,
-											u32,
-											ValueQuery, >;
-
+	// https://docs.substrate.io/v3/runtime/storage
 	#[pallet::storage]
 	#[pallet::getter(fn number_of_kitties)]
 	// Learn more about declaring storage items:
 	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
 	pub type NumOfKitties<T> = StorageValue<_, u32, ValueQuery>;
-	
+
+	// Key: dna
+	// Value: kitty
 	#[pallet::storage]
 	#[pallet::getter(fn kitties)]
 	pub(super) type Kitties<T: Config> = StorageMap<_, Blake2_128Concat, Vec<u8>, Kitty<T>, OptionQuery>;
@@ -91,17 +68,17 @@ pub mod pallet {
 	#[pallet::getter(fn kitties_by_owner)]
 	pub(super) type KittiesOwned<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, Vec<Vec<u8>>, OptionQuery>;
 
-
 	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
+	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
-		DeleteNumber(T::AccountId),
+		// Kitty created.
+		// Parameter: [dna, who, price].
 		KittyStored(Vec<u8>, u32),
+
+		// Kitty changed owner.
+		// Parameter: [dna, old_owner, new_owner].
 		KittyChangedOwner(Vec<u8>, T::AccountId, T::AccountId),
 	}
 
@@ -109,9 +86,7 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Error names should be descriptive.
-		NoneValue,
 		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
 		KittyNotExist,
 		KittyAlreadyExist,
 		KittyNotOwned,
@@ -125,65 +100,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
-
-		// Thêm put_number: 
-		
-		#[pallet::weight( 10_000 + T::DbWeight::get().writes(1).ref_time() )]
-		pub fn put_number(origin: OriginFor<T>, number:u32) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			<Number<T>>::insert(who.clone(),number);
-			Self::deposit_event(Event::SomethingStored(number, who));
-			Ok(())
-
-		}
-		// Them delete_number
-
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn delete_number(origin: OriginFor<T>) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			// Update storage: delete number
-			<Number<T>>::remove(who.clone());
-			// Emit an event.
-			Self::deposit_event(Event::DeleteNumber(who));
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
-
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}	
-		}
-
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_kitty(origin: OriginFor<T>, dna: Vec<u8>, price: u32) -> DispatchResult {
 			// Check that the extrinsic was signed and get the signer.
 			// This function will return an error if the extrinsic is not signed.
@@ -230,7 +147,8 @@ pub mod pallet {
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
+
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn change_kitty_owner(origin: OriginFor<T>, dna: Vec<u8>, new_owner: T::AccountId) -> DispatchResult {
 			// Check that the extrinsic was signed and get the signer.
 			// This function will return an error if the extrinsic is not signed.
@@ -279,7 +197,6 @@ pub mod pallet {
 		}
 	}
 }
-
 
 // helper functions
 impl<T> Pallet<T> {
